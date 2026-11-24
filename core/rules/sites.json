@@ -1,0 +1,330 @@
+{
+  "version": 1,
+  "sites": [
+    {
+      "id": "cnki",
+      "name": "CNKI",
+      "home": "https://www.cnki.net/",
+      "hosts": [
+        "cnki.net",
+        "cnki.com.cn"
+      ],
+      "pages": [
+        {
+          "kind": "list",
+          "records": "table.result-table-list tbody tr",
+          "fields": {
+            "title": {
+              "sel": [
+                "td.name a.fz14",
+                "td.name a"
+              ]
+            },
+            "url": {
+              "sel": [
+                "td.name a.fz14",
+                "td.name a"
+              ],
+              "attr": "href"
+            },
+            "id": {
+              "sel": "input.cbItem",
+              "attr": "value"
+            },
+            "authors": {
+              "sel": [
+                "td.author a",
+                "td.author"
+              ],
+              "all": true
+            },
+            "container": {
+              "sel": [
+                "td.source a",
+                "td.source"
+              ]
+            },
+            "date": {
+              "sel": "td.date"
+            },
+            "kind": {
+              "sel": "td.data"
+            },
+            "citedBy": {
+              "sel": "td.quote"
+            }
+          }
+        },
+        {
+          "kind": "detail",
+          "when": ".wx-tit",
+          "fields": {
+            "title": {
+              "sel": ".wx-tit > h1"
+            },
+            "authors": {
+              "sel": [
+                "#authorpart > span",
+                ".wx-tit > h3:first-of-type > span"
+              ],
+              "all": true
+            },
+            "institution": {
+              "sel": [
+                ".wx-tit > h3:nth-of-type(2) a",
+                ".wx-tit > h3:nth-of-type(2) > span"
+              ]
+            },
+            "abstract": {
+              "sel": [
+                "#ChDivSummary",
+                ".abstract-text"
+              ]
+            },
+            "keywords": {
+              "sel": [
+                "p.keywords > a",
+                ".keywords a"
+              ],
+              "all": true
+            },
+            "container": {
+              "sel": [
+                ".top-tip > span > a:first-of-type",
+                ".top-tip a"
+              ]
+            },
+            "source": {
+              "sel": ".top-tip > span > a:nth-of-type(2)"
+            },
+            "pages": {
+              "sel": ".total-inform > span",
+              "match": "页码[:：]\\s*(.+)"
+            },
+            "dbcode": {
+              "sel": "#paramdbcode",
+              "attr": "value"
+            },
+            "id": {
+              "sel": "#paramfilename",
+              "attr": "value"
+            }
+          },
+          "labels": {
+            "rows": "li.top-space, .row",
+            "label": ".rowtit",
+            "value": "p, .rowtit + span, .rowtit + *",
+            "map": {
+              "DOI": "doi",
+              "专辑": "subject",
+              "分类号": "classification",
+              "导师": "advisor",
+              "学位授予单位": "institution",
+              "学位授予年度": "year",
+              "会议名称": "container",
+              "会议地点": "place",
+              "会议时间": "date",
+              "出版单位": "publisher",
+              "报纸名称": "container",
+              "出版日期": "date",
+              "页码": "pages"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "wanfang",
+      "name": "Wanfang Data",
+      "home": "https://www.wanfangdata.com.cn/",
+      "hosts": [
+        "wanfangdata.com.cn"
+      ],
+      "pages": [
+        {
+          "kind": "list",
+          "records": ".normal-list",
+          "fields": {
+            "title": {
+              "sel": ".title-area .title"
+            },
+            "id": {
+              "sel": ".title-id-hidden"
+            },
+            "kind": {
+              "sel": ".essay-type"
+            },
+            "authors": {
+              "sel": ".author-area > span.authors",
+              "all": true,
+              "drop": "^\\d{4}\\s*年"
+            },
+            "source": {
+              "sel": ".author-area > span.authors",
+              "all": true,
+              "match": "^(\\d{4}\\s*年.*)$"
+            },
+            "container": {
+              "sel": ".author-area > .periodical-title"
+            },
+            "institution": {
+              "sel": ".author-area > .org",
+              "match": "^(.*?)\\d{4}$"
+            },
+            "year": {
+              "sel": ".author-area > .org",
+              "match": "(\\d{4})$"
+            },
+            "keywords": {
+              "sel": ".keywords-area .keywords-list",
+              "all": true
+            }
+          }
+        },
+        {
+          "kind": "detail",
+          "when": ".detailTitle, .detailList",
+          "fields": {
+            "title": {
+              "sel": "meta[property='og:title']",
+              "attr": "content"
+            },
+            "authors": {
+              "sel": "meta[property='og:article:author']",
+              "attr": "content"
+            },
+            "keywords": {
+              "sel": "meta[property='og:article:tag']",
+              "attr": "content"
+            },
+            "date": {
+              "sel": "meta[property='og:article:published_time']",
+              "attr": "content"
+            },
+            "url": {
+              "sel": "meta[property='og:url']",
+              "attr": "content"
+            },
+            "abstract": {
+              "sel": ".summary .text-overflow"
+            },
+            "container": {
+              "sel": ".periodicalName"
+            },
+            "issn": {
+              "sel": ".periodicalDataItem",
+              "all": true,
+              "match": "ISSN[:：]\\s*(\\S+)"
+            },
+            "source": {
+              "sel": ".publishData"
+            },
+            "doi": {
+              "sel": [
+                ".doiStyle a",
+                ".doi a"
+              ]
+            },
+            "kind": {
+              "sel": "head > title",
+              "match": "-(期刊|学位论文|会议论文|专利|标准|成果|图书|法规)-万方"
+            }
+          },
+          "labels": {
+            "rows": ".detailList .list",
+            "label": ".item",
+            "value": ".itemUrl, .text-overflow, :scope > span:nth-child(2)",
+            "map": {
+              "页数": {
+                "field": "pages",
+                "match": "(\\d+\\s*-\\s*\\d+)"
+              },
+              "学位授予单位": "institution",
+              "授予学位": "degree",
+              "导师姓名": "advisor",
+              "学位年度": "year",
+              "会议名称": "container",
+              "会议地点": "place",
+              "主办单位": "publisher",
+              "母体文献": "container"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "cqvip",
+      "name": "CQVIP",
+      "home": "https://www.cqvip.com/",
+      "hosts": [
+        "cqvip.com"
+      ],
+      "pages": [
+        {
+          "kind": "list",
+          "records": ".content-arrange > .item",
+          "fields": {
+            "title": {
+              "sel": "a.title"
+            },
+            "url": {
+              "sel": "a.title",
+              "attr": "href"
+            },
+            "kind": {
+              "sel": ".authorTag > span:first-child"
+            },
+            "authors": {
+              "sel": ".authorTag .a-name",
+              "all": true
+            },
+            "container": {
+              "sel": ".firstLine .hoverSource"
+            },
+            "source": {
+              "sel": ".firstLine > span.f-c-d71"
+            },
+            "keywords": {
+              "sel": ".six-wrap",
+              "match": "^关键词[:：]\\s*(.+)$"
+            }
+          }
+        },
+        {
+          "kind": "detail",
+          "when": ".mainContainerDataList-item",
+          "fields": {
+            "title": {
+              "sel": "head > title",
+              "match": "^(.+?)-文献详情-"
+            }
+          },
+          "labels": {
+            "rows": ".mainContainerDataList-item",
+            "label": ".Container-item-title",
+            "value": ":scope > div:nth-child(2)",
+            "map": {
+              "作者": {
+                "field": "authors",
+                "sel": "a",
+                "all": true
+              },
+              "摘要": {
+                "field": "abstract",
+                "match": "^(.*?)(?:\\s*摘要译文)?$"
+              },
+              "来源": "source",
+              "关键词": "keywords",
+              "DOI": "doi",
+              "学位授予单位": "institution",
+              "授予学位": "degree",
+              "导师": "advisor",
+              "学位年度": "year",
+              "会议名称": "container"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+[package]
+name = "paperloom-search"
+description = "Searches scholarly databases: the open ones (Crossref, OpenAlex, arXiv, PubMed, Semantic Scholar), library catalogues over SRU (Library of Congress, K10plus) and Z39.50 and, with the person's key, Web of Science, Scopus, ScienceDirect, IEEE Xplore and Springer Nature"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+encoding_rs = "0.8"
+paperloom-http.workspace = true
+paperloom-metadata.workspace = true
+paperloom-model.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+unicode-normalization = "0.1"
+url = "2"

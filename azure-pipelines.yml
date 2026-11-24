@@ -1,0 +1,472 @@
+# Azure Pipelines. Free tier for private projects: one job at a time, at
+# most 60 minutes each, 1,800 minutes a month. Which service runs what:
+# docs/ci.md; the steps are scripts/ci/run.sh, shared with the other services.
+#
+# Nothing runs on a schedule. A v* tag builds the Windows app and adds it to
+# the tag's GitHub release; Run pipeline builds what `target` says:
+#   windows        the Windows installers (the default, and what tags build)
+#   linux-android  the Linux and Android apps, when Cloud Build is out of minutes
+#   checks         the checks CircleCI runs on every push, when it is out of credits;
+#                  `checks` names which (core server ui), so a run spends no
+#                  minutes on parts a change does not touch. The core job also
+#                  runs Tesseract and LibreOffice on real files (real-files.sh).
+#   android-test   an x86_64 APK installed on an Android emulator (the agents
+#                  have KVM) for the share and phone checks, with screenshots
+#   desktop-test   the web UI at desktop window sizes with screenshots and an
+#                  accessibility report, when CircleCI is out of credits
+#   desktop-e2e    the Linux app installed from its .deb and driven end to end
+#                  (tauri-driver; desktop-e2e.sh), with screenshots; appRun
+#                  takes the `linux` packages of an earlier run instead
+#   windows-e2e    the same for the Windows app: its NSIS installer, driven
+#                  through msedgedriver (windows-e2e.ps1); appRun takes the
+#                  `windows` installers of an earlier run
+#   wps-e2e        WPS for Linux in a virtual display with a probe add-in that
+#                  reports what WPS's JS add-in runtime offers (wps-e2e.sh);
+#                  appRun takes the `linux` packages of an earlier run, whose
+#                  app installs its WPS add-in and cites through it in WPS
+#   macos          installs and starts the notarized Mac app from a Mac Direct
+#                  build (macAppUrl: the link to its "stapled notarized archive"
+#                  from the App Store Connect API) and keeps screenshots
+#
+# Pipeline variables (secret): GITHUB_RELEASE_TOKEN for releases;
+# ANDROID_KEYSTORE_B64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS for the
+# APK (signed with a throwaway key without them).
+trigger:
+  branches:
+    exclude: ["*"]
+  tags:
+    include: ["v*"]
+
+pr: none
+
+parameters:
+  - name: target
+    displayName: What to build
+    type: string
+    default: windows
+    values: [windows, linux-android, checks, android-test, desktop-test, desktop-e2e, windows-e2e, wps-e2e, macos]
+  - name: checks
+    displayName: Which checks (target checks)
+    type: string
+    default: core server ui
+  - name: apkRun
+    displayName: Run whose APK to test (target android-test; 0 builds one)
+    type: number
+    default: 0
+  - name: appRun
+    displayName: Run whose packages to test (targets desktop-e2e, windows-e2e, wps-e2e; 0 builds them, or for wps-e2e runs the probe)
+    type: number
+    default: 0
+  - name: macAppUrl
+    displayName: Mac app zip to install (target macos)
+    type: string
+    default: " "
+
+variables:
+  CARGO_TERM_COLOR: always
+  npm_config_cache: $(Pipeline.Workspace)/.npm
+
+jobs:
+  - ${{ if eq(parameters.target, 'windows') }}:
+      - job: windows_test
+        displayName: Test the core on Windows
+        pool:
+          vmImage: windows-2025
+        timeoutInMinutes: 60
+        steps:
+          - checkout: self
+            fetchDepth: 1
+          - task: UseNode@1
+            inputs:
+              version: 24.x
+          - task: Cache@2
+            displayName: npm cache
+            inputs:
+              key: npm | "$(Agent.OS)" | app/package-lock.json
+              restoreKeys: npm | "$(Agent.OS)"
+              path: $(npm_config_cache)
+          - bash: scripts/ci/run.sh windows-test
+            displayName: Test
+
+      - job: windows_app
+        displayName: Windows app
+        dependsOn: windows_test
+        pool:
+          vmImage: windows-2025
+        timeoutInMinutes: 60
+        steps:
+          - checkout: self
+            fetchDepth: 1
+          - task: UseNode@1
+            inputs:
+              version: 24.x
+          - task: Cache@2
+            displayName: npm cache
+            inputs:
+              key: npm | "$(Agent.OS)" | app/package-lock.json
+              restoreKeys: npm | "$(Agent.OS)"
+              path: $(npm_config_cache)
+          - bash: |
+              case "$BUILD_SOURCEBRANCH" in
+                refs/tags/v*) export RELEASE_TAG="${BUILD_SOURCEBRANCH#refs/tags/}" ;;
+              esac
+              scripts/ci/run.sh windows-app
+            displayName: Build
+            env:
+              GITHUB_RELEASE_TOKEN: $(GITHUB_RELEASE_TOKEN)
+              GITHUB_REPOSITORY: $(Build.Repository.Name)
+          - publish: dist
+            artifact: windows
+            displayName: Keep the installers
+          # Install what was just built, start it, and keep screenshots.
+          - pwsh: scripts/ci/windows-smoke.ps1 -Dist dist -Out windows-screens
+            displayName: Install and start
+          - publish: windows-screens
+            artifact: windows-screens
+            displayName: Keep the screenshots
+            condition: always()
+
+  - ${{ if eq(parameters.target, 'linux-android') }}:
+      - job: linux_app
+        displayName: Linux app
+        pool:
+          vmImage: ubuntu-24.04
+        timeoutInMinutes: 60
+        steps:
+          - checkout: self
+            fetchDepth: 1
+          - task: UseNode@1
+            inputs:
+              version: 24.x
+          - bash: scripts/ci/run.sh linux-app
+            displayName: Build
+          - publish: dist
+            artifact: linux
+            displayName: Keep the packages
+
+      - job: android_app
+        displayName: Android app
+        pool:
+          vmImage: ubuntu-24.04
+        timeoutInMinutes: 60
+        steps:
+          - checkout: self
+            fetchDepth: 1
+          - task: UseNode@1
+            inputs:
+              version: 24.x
+          - bash: scripts/ci/run.sh android-app
+            displayName: Build
+            env:
+              ANDROID_KEYSTORE_B64: $(ANDROID_KEYSTORE_B64)
+              ANDROID_KEYSTORE_PASSWORD: $(ANDROID_KEYSTORE_PASSWORD)
+              ANDROID_KEY_ALIAS: $(ANDROID_KEY_ALIAS)
+          - publish: dist
+            artifact: android
+            displayName: Keep the APK
+
+  - ${{ if eq(parameters.target, 'macos') }}:
+      - job: macos_smoke
+        displayName: Mac app, installed and started
+        pool:
+          # The app needs macOS 26; this image is Intel, the app is universal.
+          vmImage: macOS-26
+        timeoutInMinutes: 20
+        steps:
+          - checkout: self
+            fetchDepth: 1
+          - bash: scripts/ci/macos-smoke.sh "$APP_URL" mac-screens
+            displayName: Install and start
+            env:
+              APP_URL: ${{ parameters.macAppUrl }}
+          - publish: mac-screens
+            artifact: mac-screens
+            displayName: Keep the screenshots
+            condition: always()
+
+  - ${{ if eq(parameters.target, 'android-test') }}:
+      # Two jobs, since each has 60 minutes: the APK, then the emulator. With
+      # apkRun the emulator takes that run's APK instead (when only the test
+      # scripts changed since).
+      - ${{ if eq(parameters.apkRun, 0) }}:
+          - job: android_test_apk
+            displayName: Android x86_64 APK for the emulator
+            pool:
+              vmImage: ubuntu-24.04
+            timeoutInMinutes: 60
+            steps:
+              - checkout: self
+                fetchDepth: 1
+              - task: UseNode@1
+                inputs:
+                  version: 24.x
+              - bash: scripts/ci/run.sh android-test-apk
+                displayName: Build
+              - publish: dist
+                artifact: android-test-apk
+                displayName: Keep the APK
+
+      - job: android_test
+        displayName: Android share and phone tests on an emulator
+        ${{ if eq(parameters.apkRun, 0) }}:
+          dependsOn: android_test_apk
+        pool:
+          vmImage: ubuntu-24.04
+        timeoutInMinutes: 60
+        steps:
+          - checkout: self
+            fetchDepth: 1
+          - ${{ if eq(parameters.apkRun, 0) }}:
+              - download: current
+                artifact: android-test-apk
+                displayName: The APK
+          - ${{ if ne(parameters.apkRun, 0) }}:
+              - task: DownloadPipelineArtifact@2
+                displayName: The APK of run ${{ parameters.apkRun }}
+                inputs:
+                  buildType: specific
+                  project: $(System.TeamProjectId)
+                  definition: $(System.DefinitionId)
+                  buildVersionToDownload: specific
+                  pipelineId: ${{ parameters.apkRun }}
+                  artifactName: android-test-apk
+                  targetPath: $(Pipeline.Workspace)/android-test-apk
+          - bash: scripts/ci/run.sh android-test
+            displayName: Run
+            env:
+              ANDROID_TEST_APK: $(Pipeline.Workspace)/android-test-apk
+          - publish: test-results/android
+            artifact: android-test
+            displayName: Keep the screenshots
+            condition: always()
+
+  - ${{ if eq(parameters.target, 'desktop-e2e') }}:
+      - ${{ if eq(parameters.appRun, 0) }}:
+          - job: desktop_e2e_app
+            displayName: Linux .deb for the end-to-end test
+            pool:
+              vmImage: ubuntu-24.04
+            timeoutInMinutes: 60
+            steps:
+              - checkout: self
+                fetchDepth: 1
+              - task: UseNode@1
+                inputs:
+                  version: 24.x
+              - bash: scripts/ci/run.sh linux-app
+                displayName: Build
+                env:
+                  LINUX_BUNDLES: deb
+              - publish: dist
+                artifact: linux
+                displayName: Keep the package
+
+      - job: desktop_e2e
+        displayName: Linux app, installed and driven end to end
+        ${{ if eq(parameters.appRun, 0) }}:
+          dependsOn: desktop_e2e_app
+        pool:
+          vmImage: ubuntu-24.04
+        timeoutInMinutes: 30
+        steps:
+          - checkout: self
+            fetchDepth: 1
+          - task: UseNode@1
+            inputs:
+              version: 24.x
+          - ${{ if eq(parameters.appRun, 0) }}:
+              - download: current
+                artifact: linux
+                displayName: The package
+          - ${{ if ne(parameters.appRun, 0) }}:
+              - task: DownloadPipelineArtifact@2
+                displayName: The packages of run ${{ parameters.appRun }}
+                inputs:
+                  buildType: specific
+                  project: $(System.TeamProjectId)
+                  definition: $(System.DefinitionId)
+                  buildVersionToDownload: specific
+                  pipelineId: ${{ parameters.appRun }}
+                  artifactName: linux
+                  targetPath: $(Pipeline.Workspace)/linux
+          - bash: scripts/ci/run.sh desktop-e2e
+            displayName: Run
+            env:
+              DESKTOP_APP: $(Pipeline.Workspace)/linux
+          - publish: test-results/desktop-e2e
+            artifact: desktop-e2e
+            displayName: Keep the screenshots
+            condition: always()
+
+  - ${{ if eq(parameters.target, 'windows-e2e') }}:
+      - ${{ if eq(parameters.appRun, 0) }}:
+          - job: windows_e2e_app
+            displayName: Windows installer for the end-to-end test
+            pool:
+              vmImage: windows-2025
+            timeoutInMinutes: 60
+            steps:
+              - checkout: self
+                fetchDepth: 1
+              - task: UseNode@1
+                inputs:
+                  version: 24.x
+              - task: Cache@2
+                displayName: npm cache
+                inputs:
+                  key: npm | "$(Agent.OS)" | app/package-lock.json
+                  restoreKeys: npm | "$(Agent.OS)"
+                  path: $(npm_config_cache)
+              - bash: scripts/ci/run.sh windows-app
+                displayName: Build
+                env:
+                  WINDOWS_BUNDLES: nsis
+                  # A Word manifest to install, before the add-in is hosted.
+                  PAPERLOOM_WORD_ADDIN_ORIGIN: https://word-addin.paperloom.test
+              - publish: dist
+                artifact: windows
+                displayName: Keep the installer
+
+      - job: windows_e2e
+        displayName: Windows app, installed and driven end to end
+        ${{ if eq(parameters.appRun, 0) }}:
+          dependsOn: windows_e2e_app
+        pool:
+          vmImage: windows-2025
+        timeoutInMinutes: 30
+        steps:
+          - checkout: self
+            fetchDepth: 1
+          - task: UseNode@1
+            inputs:
+              version: 24.x
+          - ${{ if eq(parameters.appRun, 0) }}:
+              - download: current
+                artifact: windows
+                displayName: The installer
+          - ${{ if ne(parameters.appRun, 0) }}:
+              - task: DownloadPipelineArtifact@2
+                displayName: The installers of run ${{ parameters.appRun }}
+                inputs:
+                  buildType: specific
+                  project: $(System.TeamProjectId)
+                  definition: $(System.DefinitionId)
+                  buildVersionToDownload: specific
+                  pipelineId: ${{ parameters.appRun }}
+                  artifactName: windows
+                  targetPath: $(Pipeline.Workspace)/windows
+          - bash: scripts/ci/run.sh windows-e2e
+            displayName: Run
+            env:
+              WINDOWS_APP: $(Pipeline.Workspace)/windows
+          - publish: test-results/desktop-e2e
+            artifact: windows-e2e
+            displayName: Keep the screenshots
+            condition: always()
+
+  - ${{ if eq(parameters.target, 'wps-e2e') }}:
+      - job: wps_e2e
+        ${{ if eq(parameters.appRun, 0) }}:
+          displayName: WPS for Linux with the probe add-in
+        ${{ if ne(parameters.appRun, 0) }}:
+          displayName: WPS for Linux citing through the app's add-in
+        pool:
+          vmImage: ubuntu-24.04
+        timeoutInMinutes: 30
+        steps:
+          - checkout: self
+            fetchDepth: 1
+          - task: UseNode@1
+            inputs:
+              version: 24.x
+          - ${{ if ne(parameters.appRun, 0) }}:
+              - task: DownloadPipelineArtifact@2
+                displayName: The packages of run ${{ parameters.appRun }}
+                inputs:
+                  buildType: specific
+                  project: $(System.TeamProjectId)
+                  definition: $(System.DefinitionId)
+                  buildVersionToDownload: specific
+                  pipelineId: ${{ parameters.appRun }}
+                  artifactName: linux
+                  targetPath: $(Pipeline.Workspace)/linux
+          - bash: scripts/ci/run.sh wps-e2e
+            displayName: Run
+            ${{ if ne(parameters.appRun, 0) }}:
+              env:
+                WPS_APP: $(Pipeline.Workspace)/linux
+          - publish: test-results/wps-e2e
+            artifact: wps-e2e
+            displayName: Keep the reports and screenshots
+            condition: always()
+
+  - ${{ if eq(parameters.target, 'desktop-test') }}:
+      - job: desktop_test
+        displayName: Web UI at desktop sizes, with screenshots
+        pool:
+          vmImage: ubuntu-24.04
+        timeoutInMinutes: 30
+        steps:
+          - checkout: self
+            fetchDepth: 1
+          - task: UseNode@1
+            inputs:
+              version: 24.x
+          - bash: scripts/ci/run.sh desktop-test
+            displayName: Run
+          - publish: test-results/desktop
+            artifact: desktop-test
+            displayName: Keep the screenshots
+            condition: always()
+
+  - ${{ if eq(parameters.target, 'checks') }}:
+      - ${{ if contains(parameters.checks, 'core') }}:
+          - job: check_core
+            displayName: Check core
+            pool:
+              vmImage: ubuntu-24.04
+            timeoutInMinutes: 60
+            steps:
+              - checkout: self
+                fetchDepth: 1
+              - task: UseNode@1
+                inputs:
+                  version: 24.x
+              - bash: scripts/ci/run.sh core
+                displayName: Run
+                env:
+                  CI_REAL_FILES: 1
+              - publish: /tmp/paperloom-real
+                artifact: real-files
+                displayName: Keep the files
+                condition: always()
+
+      - ${{ if contains(parameters.checks, 'server') }}:
+          - job: check_server
+            displayName: Check server
+            pool:
+              vmImage: ubuntu-24.04
+            timeoutInMinutes: 60
+            steps:
+              - checkout: self
+                fetchDepth: 1
+              - task: UseNode@1
+                inputs:
+                  version: 24.x
+              - bash: scripts/ci/run.sh server
+                displayName: Run
+
+      - ${{ if contains(parameters.checks, 'ui') }}:
+          - job: check_ui
+            displayName: Check ui
+            pool:
+              vmImage: ubuntu-24.04
+            timeoutInMinutes: 60
+            steps:
+              - checkout: self
+                fetchDepth: 1
+              - task: UseNode@1
+                inputs:
+                  version: 24.x
+              - bash: scripts/ci/run.sh ui
+                displayName: Run

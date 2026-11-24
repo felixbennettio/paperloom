@@ -1,0 +1,17 @@
+[package]
+name = "tauri-plugin-paperloom-share"
+description = "Paperloom on Android: what other apps share, and room for the system bars"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+# Tauri finds the plugin's Android project through this.
+links = "tauri-plugin-paperloom-share"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
+
+[dependencies]
+serde.workspace = true
+tauri = { version = "2", features = [] }

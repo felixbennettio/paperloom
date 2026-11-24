@@ -1,0 +1,231 @@
+# Builds every app, signed: Linux (AppImage, deb, rpm), Android (APK),
+# Windows (NSIS in six languages and an English MSI, after testing the core on
+# Windows) and the notarized Mac DMG, as artifacts; with TESTFLIGHT=true or on
+# a v* tag, the iOS and macOS apps go to App Store Connect too.
+#
+# Included by .gitlab-ci.yml (v* tags, runs with BUILD=true) and by the
+# nightly child pipeline. Each runner is its own VM, so the jobs run side by
+# side; ubuntu Rust jobs run at most six compilers in their 7 GB container.
+
+.build:
+  stage: build
+  interruptible: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "parent_pipeline" || $CI_COMMIT_TAG =~ /^v/
+    - if: $CI_PIPELINE_SOURCE == "web" && $BUILD == "true"
+
+# The App Store Connect API key in a file for xcodebuild and notarytool, and
+# a scratch folder in place of the runner's; both go when the job ends.
+.apple-signing:
+  variables:
+    ISSUER_ID: $APP_STORE_CONNECT_ISSUER_ID
+    KEY_ID: $APP_STORE_CONNECT_KEY_ID
+    TEAM_ID: $APPLE_TEAM_ID
+    JOB_TMP: $CI_PROJECT_DIR/.job-tmp
+  before_script:
+    - |
+      for v in ISSUER_ID KEY_ID TEAM_ID APP_STORE_CONNECT_PRIVATE_KEY; do
+        if [ -z "${!v:-}" ]; then echo "The App Store Connect variables are not set (see the top of .gitlab-ci.yml)." >&2; exit 1; fi
+      done
+    - mkdir -p "$JOB_TMP"
+    # The key is the .p8 file's text, or that text base64-encoded on one line,
+    # which GitLab can mask and hide (a value with line breaks cannot be).
+    - |
+      case "$APP_STORE_CONNECT_PRIVATE_KEY" in
+        -----BEGIN*) printf '%s\n' "$APP_STORE_CONNECT_PRIVATE_KEY" ;;
+        *) printf '%s' "$APP_STORE_CONNECT_PRIVATE_KEY" | openssl base64 -d -A ;;
+      esac > "$JOB_TMP/AuthKey.p8"
+    - AUTH_KEY="$JOB_TMP/AuthKey.p8"
+    - |
+      VERSION=$(sed -n 's/^ *MARKETING_VERSION: *"\{0,1\}\([^"]*\)"\{0,1\}$/\1/p' apple/project.yml)
+    # Build numbers must grow with every upload: the job ID grows across the
+    # instance, retries included; 2000 clears the numbers uploaded before the
+    # move to GitLab (up to ~1600).
+    - BUILD_NUMBER=$(( CI_JOB_ID + 2000 ))
+  after_script:
+    # Revoke unusable development certificates, then remove the API key.
+    - |
+      if [ -n "${APP_STORE_CONNECT_KEY_ID:-}" ]; then
+        python3 -m venv "$JOB_TMP/venv"
+        # The system Python 3.9 may lack a wheel for cryptography's newest release.
+        "$JOB_TMP/venv/bin/pip" install -q --only-binary=cryptography,cffi 'pyjwt[crypto]'
+        "$JOB_TMP/venv/bin/python" scripts/appstore_certs.py prune
+      fi
+    - rm -rf "$JOB_TMP"
+
+linux:
+  extends: .build
+  tags: [linux]
+  timeout: 60m
+  # linuxdeploy, which makes the AppImage, now and then fails for no reason
+  # it reports; the same build passes when run again.
+  retry:
+    max: 1
+    when: script_failure
+  variables:
+    CARGO_BUILD_JOBS: "6"
+  script:
+    - scripts/ci/run.sh linux-app
+  artifacts:
+    name: linux
+    expire_in: 2 weeks
+    paths: [dist/]
+
+# ANDROID_KEYSTORE_B64, ANDROID_KEYSTORE_PASSWORD and ANDROID_KEY_ALIAS, when
+# set, sign the APK with the release key (run.sh reads them).
+android:
+  extends: .build
+  tags: [linux]
+  timeout: 60m
+  variables:
+    CARGO_BUILD_JOBS: "6"
+  script:
+    - scripts/ci/run.sh android-app
+  artifacts:
+    name: android
+    expire_in: 2 weeks
+    paths: [dist/]
+
+# The core's tests on Windows, then the installers; run.sh in Git Bash.
+windows:
+  extends: .build
+  tags: [windows]
+  timeout: 60m
+  script:
+    - $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + $env:Path
+    - $bash = 'C:\Program Files\Git\bin\bash.exe'
+    - '& $bash scripts/ci/run.sh windows-test'
+    - '& $bash scripts/ci/run.sh windows-app'
+  artifacts:
+    name: windows
+    expire_in: 2 weeks
+    paths: [dist/]
+
+macos:
+  extends: [.build, .apple-signing]
+  tags: [macos]
+  timeout: 90m
+  script:
+    - scripts/ci/setup-rust.sh
+    - scripts/build-apple-core.sh --slices macos
+    # Swap the file rather than passing CODE_SIGN_ENTITLEMENTS to xcodebuild,
+    # which would apply it to the Swift package targets as well.
+    - cp apple/Paperloom/Support/Paperloom-macOS-Direct.entitlements apple/Paperloom/Support/Paperloom-macOS.entitlements
+    - (cd apple && xcodegen generate)
+    - |
+      xcodebuild archive -quiet \
+        -project apple/Paperloom.xcodeproj -scheme Paperloom-macOS -configuration Release \
+        -destination 'generic/platform=macOS' -archivePath "$JOB_TMP/Paperloom.xcarchive" \
+        -allowProvisioningUpdates \
+        -authenticationKeyPath "$AUTH_KEY" -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID" \
+        DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Automatic CODE_SIGN_IDENTITY="Apple Development" \
+        MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD_NUMBER" ENABLE_HARDENED_RUNTIME=YES
+    # Sign with Developer ID.
+    - |
+      /usr/libexec/PlistBuddy -c "Clear dict" \
+        -c "Add :method string developer-id" \
+        -c "Add :destination string export" \
+        -c "Add :teamID string $TEAM_ID" \
+        -c "Add :signingStyle string automatic" \
+        "$JOB_TMP/ExportOptions.plist"
+      xcodebuild -exportArchive \
+        -archivePath "$JOB_TMP/Paperloom.xcarchive" \
+        -exportOptionsPlist "$JOB_TMP/ExportOptions.plist" \
+        -exportPath "$JOB_TMP/export" \
+        -allowProvisioningUpdates \
+        -authenticationKeyPath "$AUTH_KEY" -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID"
+      APP="$JOB_TMP/export/Paperloom.app"
+      codesign --verify --deep --strict --verbose=2 "$APP"
+      codesign -dv "$APP" 2>&1 | grep -E 'Authority=Developer ID|flags=.*runtime'
+    # Notarize the app.
+    - |
+      ditto -c -k --keepParent "$APP" "$JOB_TMP/Paperloom.zip"
+      xcrun notarytool submit "$JOB_TMP/Paperloom.zip" --wait --timeout 45m \
+        --key "$AUTH_KEY" --key-id "$KEY_ID" --issuer "$ISSUER_ID"
+      xcrun stapler staple "$APP"
+      spctl --assess --type execute --verbose=2 "$APP"
+    - |
+      NAME="Paperloom-$VERSION-macos-universal"
+      mkdir -p "$JOB_TMP/dmg" dist
+      cp -R "$APP" "$JOB_TMP/dmg/"
+      ln -s /Applications "$JOB_TMP/dmg/Applications"
+      hdiutil create -volname "Paperloom $VERSION" -srcfolder "$JOB_TMP/dmg" -ov -format UDZO "dist/$NAME.dmg"
+      IDENTITY=$(security find-identity -v -p codesigning | sed -n "s/.*\"\(Developer ID Application: .*($TEAM_ID)\)\"/\1/p" | head -1)
+      if [ -n "$IDENTITY" ]; then
+        codesign --sign "$IDENTITY" --timestamp "dist/$NAME.dmg"
+      else
+        echo "No Developer ID certificate in this keychain; the DMG itself is not signed"
+      fi
+      xcrun notarytool submit "dist/$NAME.dmg" --wait --timeout 45m \
+        --key "$AUTH_KEY" --key-id "$KEY_ID" --issuer "$ISSUER_ID"
+      xcrun stapler staple "dist/$NAME.dmg"
+  artifacts:
+    name: macos-direct
+    expire_in: 2 weeks
+    paths: [dist/]
+
+testflight:
+  extends: .apple-signing
+  stage: build
+  tags: [macos]
+  timeout: 90m
+  interruptible: true
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v/ || $TESTFLIGHT == "true"
+  parallel:
+    matrix:
+      - PLATFORM: [ios, macos]
+  script:
+    - scripts/ci/setup-rust.sh
+    - scripts/build-apple-core.sh --slices "$PLATFORM"
+    - (cd apple && xcodegen generate)
+    - |
+      if [ "$PLATFORM" = ios ]; then SCHEME=Paperloom-iOS DEST='generic/platform=iOS'; else SCHEME=Paperloom-macOS DEST='generic/platform=macOS'; fi
+      xcodebuild archive -quiet \
+        -project apple/Paperloom.xcodeproj -scheme "$SCHEME" -configuration Release \
+        -destination "$DEST" -archivePath "$JOB_TMP/Paperloom.xcarchive" \
+        -allowProvisioningUpdates \
+        -authenticationKeyPath "$AUTH_KEY" -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID" \
+        DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Automatic CODE_SIGN_IDENTITY="Apple Development" \
+        MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
+    # Sign for the App Store and upload.
+    - |
+      /usr/libexec/PlistBuddy -c "Clear dict" \
+        -c "Add :method string app-store-connect" \
+        -c "Add :destination string upload" \
+        -c "Add :teamID string $TEAM_ID" \
+        -c "Add :signingStyle string automatic" \
+        -c "Add :manageAppVersionAndBuildNumber bool false" \
+        -c "Add :uploadSymbols bool true" \
+        "$JOB_TMP/ExportOptions.plist"
+      # The upload sometimes stalls for good (at "Sending SPI analysis"):
+      # each try gets 20 minutes, and a stalled one is tried again.
+      export_archive() {
+        rm -rf "$JOB_TMP/export"
+        xcodebuild -exportArchive \
+          -archivePath "$JOB_TMP/Paperloom.xcarchive" \
+          -exportOptionsPlist "$JOB_TMP/ExportOptions.plist" \
+          -exportPath "$JOB_TMP/export" \
+          -allowProvisioningUpdates \
+          -authenticationKeyPath "$AUTH_KEY" -authenticationKeyID "$KEY_ID" -authenticationKeyIssuerID "$ISSUER_ID" &
+        local pid=$!
+        ( for _ in $(seq 240); do sleep 5; kill -0 "$pid" 2>/dev/null || exit 0; done; kill "$pid" ) >/dev/null 2>&1 &
+        wait "$pid"
+      }
+      for attempt in 1 2 3; do
+        if export_archive; then break; fi
+        if [ "$attempt" = 3 ]; then echo "The export failed three times." >&2; exit 1; fi
+        echo "Export attempt $attempt failed or stalled; trying again."
+      done
+      echo "Uploaded Paperloom $VERSION ($BUILD_NUMBER) for $PLATFORM"
+
+# Nightly only: starts pinned releases of common Zotero and Obsidian plugins
+# in the plugin runtimes.
+plugins:
+  stage: build
+  tags: [linux]
+  timeout: 20m
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "parent_pipeline"
+  script:
+    - scripts/ci/run.sh plugins

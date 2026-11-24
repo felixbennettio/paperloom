@@ -1,0 +1,118 @@
+/* What a plugin's settings and modals look like in its frame: plain
+   controls in the app's colours, light or dark. */
+
+:root {
+  color-scheme: light dark;
+  --accent: #4f46e5;
+  --border: rgba(15, 23, 42, 0.14);
+  --muted: #64748b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --accent: #818cf8;
+    --border: rgba(255, 255, 255, 0.14);
+    --muted: #94a3b8;
+  }
+}
+
+html,
+body {
+  margin: 0;
+  background: Canvas;
+  color: CanvasText;
+  font: 14px/1.5 -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+body > * {
+  padding: 16px 20px;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0 0 12px;
+  font-size: 1.1em;
+}
+
+.setting-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.setting-item-heading .setting-item-name {
+  font-weight: 600;
+}
+
+.setting-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.setting-item-description {
+  color: var(--muted);
+  font-size: 0.9em;
+}
+
+.setting-item-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+input,
+textarea,
+select,
+button {
+  font: inherit;
+  color: inherit;
+}
+
+input[type="text"],
+textarea,
+select {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+}
+
+button {
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+button.mod-cta {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: white;
+}
+
+button.mod-warning {
+  color: #d70015;
+}
+
+.prompt-input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.suggestion-item {
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.suggestion-item:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+[hidden] {
+  display: none !important;
+}

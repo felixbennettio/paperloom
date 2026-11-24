@@ -1,0 +1,44 @@
+# Parked until the Blacksmith account is verified; nothing here runs unless
+# started by hand (docs/ci.md).
+# Builds a tag on Blacksmith runners (build.yml) and adds the Linux, Android
+# and Windows apps to its GitHub release. A fallback for Google Cloud Build
+# and Azure Pipelines, which do this on every v* tag (docs/ci.md): runs by
+# hand, or on a v* tag when the repository variable RELEASE_ON_GITHUB is true.
+# The Apple apps come from Xcode Cloud.
+#
+# The tag must match the version in Cargo.toml, app/src-tauri/tauri.conf.json,
+# app/package.json and apple/project.yml. Versions starting with 0. are
+# published as pre-releases.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to publish, e.g. v0.1.0 (must exist)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  meta:
+    name: Version
+    if: github.event_name == 'workflow_dispatch' || vars.RELEASE_ON_GITHUB == 'true'
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    outputs:
+      tag: ${{ steps.v.outputs.tag }}
+    steps:
+      - id: v
+        run: echo "tag=${{ github.event.inputs.tag || github.ref_name }}" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build
+    needs: meta
+    uses: ./.github/workflows/build.yml
+    secrets: inherit
+    with:
+      release_tag: ${{ needs.meta.outputs.tag }}

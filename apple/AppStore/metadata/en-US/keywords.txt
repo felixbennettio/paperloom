@@ -1,0 +1,1 @@
+reference manager,citation,bibliography,pdf,annotate,research,doi,paper,thesis,literature,ocr

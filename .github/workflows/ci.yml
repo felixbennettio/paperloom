@@ -1,0 +1,57 @@
+# Parked until the Blacksmith account is verified; nothing here runs unless
+# started by hand (docs/ci.md).
+# GitHub Actions on Blacksmith runners: the checks, as a fallback for
+# CircleCI, which runs them on every push (docs/ci.md). Runs by hand, or on
+# every push and pull request when the repository variable CHECKS_ON_GITHUB
+# is true. The steps are scripts/ci/run.sh, shared with the other services.
+#
+# Blacksmith gives an organization 3,000 2-vCPU minutes a month; a 4-vCPU
+# minute counts twice. The repository must belong to a GitHub organization
+# with the Blacksmith app installed; nothing here runs on GitHub-hosted
+# runners.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    name: Rust core
+    if: github.event_name == 'workflow_dispatch' || vars.CHECKS_ON_GITHUB == 'true'
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: scripts/ci/run.sh core
+
+  server:
+    name: Sync service
+    if: github.event_name == 'workflow_dispatch' || vars.CHECKS_ON_GITHUB == 'true'
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: scripts/ci/run.sh server
+
+  ui:
+    name: Web UI and Tauri app
+    if: github.event_name == 'workflow_dispatch' || vars.CHECKS_ON_GITHUB == 'true'
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: scripts/ci/run.sh ui
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: paperloom-extension
+          path: target/paperloom-extension.zip

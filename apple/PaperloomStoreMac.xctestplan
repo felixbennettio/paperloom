@@ -1,0 +1,22 @@
+{
+  "configurations" : [
+    {
+      "id" : "7E2A6E9C-4D3F-4A08-BC66-5B4D9F1E3A23",
+      "name" : "Store",
+      "options" : {}
+    }
+  ],
+  "defaultOptions" : {
+    "diagnosticCollectionPolicy" : "Never"
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:Paperloom.xcodeproj",
+        "identifier" : "PAPERLOOM_MAC_SCREENS_TARGET",
+        "name" : "Paperloom-macOSScreens"
+      }
+    }
+  ],
+  "version" : 1
+}

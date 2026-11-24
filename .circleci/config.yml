@@ -1,0 +1,247 @@
+# CircleCI (free plan: 30,000 credits a month, jobs end after 60 minutes).
+# Which service runs what: docs/ci.md. The steps themselves are in
+# scripts/ci/run.sh, shared with the other services.
+#
+# - Every push: the checks (core, server, ui).
+# - Trigger Pipeline with `build` = true: the Linux and Android apps and the
+#   plugin compatibility run, as artifacts; a fallback for Google Cloud Build.
+#   Nothing runs on a schedule.
+# - Trigger Pipeline with `android_test` = true: an x86_64 APK installed on an
+#   Android emulator for share and phone checks; screenshots and the
+#   text on screen after each step are the job's artifacts (android-test/).
+# - Trigger Pipeline with `desktop_test` = true: the web UI at desktop window
+#   sizes in Chromium and WebKit, with a screenshot of each main screen and a
+#   report of overlapping and cut-off controls (desktop-test/).
+# - Trigger Pipeline with `release_tag` = v0.1.0: builds that tag and adds
+#   the Linux and Android apps to its GitHub release.
+#
+# Project environment variables: ANDROID_KEYSTORE_B64, ANDROID_KEYSTORE_PASSWORD,
+# ANDROID_KEY_ALIAS (the APK is signed with a throwaway key without them) and
+# GITHUB_RELEASE_TOKEN (releases only).
+version: 2.1
+
+parameters:
+  build:
+    type: boolean
+    default: false
+    description: Build the Linux and Android apps instead of running the checks
+  android_test:
+    type: boolean
+    default: false
+    description: Run Android share and phone tests on an emulator, with screenshots
+  desktop_test:
+    type: boolean
+    default: false
+    description: Screenshot the desktop layout at several window sizes
+  release_tag:
+    type: string
+    default: ""
+    description: Build this tag and publish the Linux and Android apps to its GitHub release
+
+executors:
+  rust:
+    docker:
+      - image: cimg/rust:1.99.1-node
+    resource_class: large
+  server:
+    docker:
+      - image: cimg/rust:1.99.1-node
+      - image: cimg/postgres:17.11
+        environment:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: paperloom_test
+    resource_class: large
+    environment:
+      PAPERLOOM_TEST_DATABASE_URL: postgres://ci:ci@127.0.0.1:5432/paperloom_test?sslmode=disable
+  android:
+    docker:
+      - image: cimg/android:2026.08.1-ndk
+    resource_class: large
+  # A VM with the Android SDK and KVM, for the emulator.
+  android-emulator:
+    machine:
+      image: android:2026.05.1
+    resource_class: large
+  small:
+    docker:
+      - image: cimg/node:24.22.0
+    resource_class: medium
+
+commands:
+  source:
+    description: Check out the commit, or the release tag when one is given
+    steps:
+      - checkout
+      - run:
+          name: Release tag
+          command: |
+            TAG="<< pipeline.parameters.release_tag >>"
+            if [ -n "$TAG" ]; then
+              git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+              git checkout -q "tags/$TAG"
+              echo "export RELEASE_TAG=$TAG" >> "$BASH_ENV"
+            fi
+            echo "export GITHUB_REPOSITORY=$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME" >> "$BASH_ENV"
+  restore-cargo:
+    parameters:
+      lockfile:
+        type: string
+        default: Cargo.lock
+    steps:
+      - restore_cache:
+          keys:
+            - cargo-v1-{{ checksum "<< parameters.lockfile >>" }}
+            - cargo-v1-
+  save-cargo:
+    parameters:
+      lockfile:
+        type: string
+        default: Cargo.lock
+    steps:
+      - save_cache:
+          key: cargo-v1-{{ checksum "<< parameters.lockfile >>" }}
+          paths:
+            - ~/.cargo/registry/index
+            - ~/.cargo/registry/cache
+            - ~/.cargo/git/db
+  restore-npm:
+    steps:
+      - restore_cache:
+          keys:
+            - npm-v1-{{ checksum "app/package-lock.json" }}
+            - npm-v1-
+
+jobs:
+  core:
+    executor: rust
+    environment:
+      # The diagram palette drawn by a test, kept to look at.
+      DIAGRAM_GALLERY: /tmp/paperloom-diagram/palette.svg
+    steps:
+      - source
+      - restore-cargo
+      - run: scripts/ci/run.sh core
+      - save-cargo
+      - store_artifacts:
+          path: /tmp/paperloom-diagram
+          destination: diagram
+
+  server:
+    executor: server
+    steps:
+      - source
+      - restore-cargo:
+          lockfile: server/Cargo.lock
+      - run: scripts/ci/run.sh server
+      - save-cargo:
+          lockfile: server/Cargo.lock
+
+  ui:
+    executor: rust
+    steps:
+      - source
+      - restore-npm
+      - restore-cargo
+      - run: scripts/ci/run.sh ui
+      - save_cache:
+          key: npm-v1-{{ checksum "app/package-lock.json" }}
+          paths:
+            - ~/.npm
+      - store_artifacts:
+          path: target/paperloom-extension.zip
+
+  linux-app:
+    executor: rust
+    steps:
+      - source
+      - restore-npm
+      - restore-cargo
+      - run: scripts/ci/run.sh linux-app
+      - store_artifacts:
+          path: dist
+          destination: linux
+
+  android-app:
+    executor: android
+    steps:
+      - source
+      - restore-npm
+      - restore-cargo
+      - run: scripts/ci/run.sh android-app
+      - store_artifacts:
+          path: dist
+          destination: android
+
+  android-test:
+    executor: android-emulator
+    steps:
+      - source
+      - restore-npm
+      - restore-cargo
+      - run:
+          name: scripts/ci/run.sh android-test
+          command: scripts/ci/run.sh android-test
+          no_output_timeout: 20m
+      - store_artifacts:
+          path: test-results/android
+          destination: android-test
+          when: always
+      - store_artifacts:
+          path: dist
+          destination: android
+          when: always
+
+  desktop-test:
+    executor: small
+    steps:
+      - source
+      - restore-npm
+      - run:
+          name: scripts/ci/run.sh desktop-test
+          command: scripts/ci/run.sh desktop-test
+      - store_artifacts:
+          path: test-results/desktop
+          destination: desktop-test
+          when: always
+
+  plugins:
+    executor: small
+    steps:
+      - source
+      - restore-npm
+      - run: scripts/ci/run.sh plugins
+
+workflows:
+  ci:
+    when:
+      and:
+        - not: << pipeline.parameters.build >>
+        - not: << pipeline.parameters.android_test >>
+        - not: << pipeline.parameters.desktop_test >>
+        - equal: ["", << pipeline.parameters.release_tag >>]
+    jobs:
+      - core
+      - server
+      - ui
+
+  build:
+    when:
+      or:
+        - << pipeline.parameters.build >>
+        - not:
+            equal: ["", << pipeline.parameters.release_tag >>]
+    jobs:
+      - linux-app
+      - android-app
+      - plugins
+
+  android-test:
+    when: << pipeline.parameters.android_test >>
+    jobs:
+      - android-test
+
+  desktop-test:
+    when: << pipeline.parameters.desktop_test >>
+    jobs:
+      - desktop-test

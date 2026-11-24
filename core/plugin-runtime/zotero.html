@@ -1,0 +1,44 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="obsidian.css" />
+    <style>
+      body { overflow: hidden; }
+      .preference-pane { height: 100vh; box-sizing: border-box; overflow: auto; transform: translateZ(0); }
+      .preference-pane vbox, .preference-pane groupbox, .preference-pane radiogroup,
+      .preference-pane description { display: block; }
+      .preference-pane hbox { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+      .preference-pane groupbox { margin-bottom: 20px; }
+      .preference-pane checkbox, .preference-pane radio { display: block; margin: 5px 0; }
+      .preference-pane checkbox > label, .preference-pane radio > label { display: inline-flex; align-items: center; gap: 6px; }
+      .preference-pane menulist { display: inline-block; }
+      .preference-pane menulist > select { width: 100%; }
+      .preference-pane menupopup, .preference-pane linkset { display: none; }
+      .preference-pane .indented-pref { margin-left: 22px; }
+      .preference-pane [disabled="true"] { opacity: .55; }
+      .preference-pane table { border-collapse: collapse; }
+      .preference-pane td, .preference-pane th { padding: 4px; }
+      .preference-pane input[type="number"] { width: 5em; }
+      .preference-pane button:disabled { cursor: default; opacity: .55; }
+      .virtualized-table-container { display: block !important; overflow: auto; min-height: 160px; }
+      .plugin-virtualized-table { width: 100%; font: inherit; border: 1px solid var(--background-modifier-border, #ccc); }
+      .plugin-virtualized-table th { position: sticky; top: 0; background: var(--background-secondary, #eee); text-align: left; }
+      .plugin-virtualized-table th button { background: transparent; border: 0; padding: 2px; color: inherit; font: inherit; cursor: pointer; }
+      .plugin-virtualized-table td { border-top: 1px solid var(--background-modifier-border, #ddd); white-space: pre-wrap; overflow-wrap: anywhere; }
+      .plugin-virtualized-table tr.selected { background: var(--interactive-accent, #3876c8); color: white; }
+      .plugin-virtualized-table:focus { outline: 2px solid var(--interactive-accent, #3876c8); outline-offset: -2px; }
+      .plugin-dialog-layer { position: fixed; inset: 0; background: var(--background-primary, white); display: flex; flex-direction: column; padding: 8px; box-sizing: border-box; z-index: 1000; }
+      .plugin-dialog-close { align-self: flex-end; margin-bottom: 4px; }
+      .plugin-dialog-content { flex: 1; height: auto; min-height: 0; padding: 12px; margin: 0; color: var(--text-normal, #222); background: var(--background-primary, white); }
+      .plugin-dialog-content input, .plugin-dialog-content select, .plugin-dialog-content textarea { max-width: 100%; box-sizing: border-box; }
+      .plugin-confirm-layer { position: fixed; inset: 0; background: #0006; z-index: 2000; display: flex; align-items: center; justify-content: center; }
+      .plugin-confirm-layer > div { background: var(--background-primary, white); color: var(--text-normal, #222); padding: 20px; max-width: 80%; border-radius: 8px; box-shadow: 0 8px 30px #0005; }
+      .plugin-confirm-layer button { margin-right: 8px; }
+    </style>
+  </head>
+  <body>
+    <script src="zotero.js"></script>
+  </body>
+</html>

@@ -1,0 +1,40 @@
+[package]
+name = "paperloom-app"
+description = "Paperloom for Windows, Linux and Android (Tauri)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+# The mobile entry point lives in the library; the desktop binary calls it.
+name = "paperloom_app_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+base64 = "0.22"
+paperloom-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tauri = { version = "2", features = [] }
+tauri-plugin-deep-link = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
+tauri-plugin-opener = "2"
+# The Android share sheet (in this repository).
+tauri-plugin-paperloom-share = { path = "plugins/share" }
+# Text read from pictures of scanned pages (Windows, Tesseract on Linux).
+paperloom-ocr = { path = "ocr" }
+
+# Seals the session and secrets for the Windows user (DPAPI).
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_Registry"] }
+
+# On Windows and Linux a sign-in callback starts a second process; this hands
+# the URL to the running one.
+[target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }

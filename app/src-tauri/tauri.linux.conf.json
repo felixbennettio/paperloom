@@ -1,0 +1,20 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "build": { "beforeBuildCommand": "npm run build && npm run build:wps" },
+  "bundle": {
+    "resources": { "../dist-wps/": "wps-addin/" },
+    "fileAssociations": [
+      {
+        "ext": ["ris"],
+        "name": "RIS",
+        "description": "RIS reference file",
+        "mimeType": "application/x-research-info-systems",
+        "role": "Viewer"
+      }
+    ],
+    "linux": {
+      "deb": { "desktopTemplate": "paperloom.desktop" },
+      "rpm": { "desktopTemplate": "paperloom.desktop" }
+    }
+  }
+}

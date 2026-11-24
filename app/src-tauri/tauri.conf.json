@@ -1,0 +1,62 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Paperloom",
+  "version": "0.1.0",
+  "identifier": "io.felixbennett.paperloom",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Paperloom",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 360,
+        "minHeight": 480
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data: blob: https:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost; frame-src plugin: http://plugin.localhost"
+    }
+  },
+  "plugins": {
+    "deep-link": {
+      "desktop": { "schemes": ["io.felixbennett.paperloom"] },
+      "mobile": [{ "scheme": ["io.felixbennett.paperloom"], "appLink": false }]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "Education",
+    "publisher": "Paperloom",
+    "copyright": "© 2026 Paperloom",
+    "shortDescription": "Research literature workbench",
+    "longDescription": "Find, collect, read, annotate, understand with AI, take notes, cite and sync research literature.",
+    "linux": {
+      "deb": { "section": "science" },
+      "rpm": { "release": "1" }
+    },
+    "windows": {
+      "wix": {
+        "language": "en-US"
+      },
+      "nsis": {
+        "languages": ["English", "SimpChinese", "TradChinese", "French", "Japanese", "Russian"],
+        "displayLanguageSelector": true
+      }
+    }
+  }
+}

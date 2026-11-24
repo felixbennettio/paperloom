@@ -1,0 +1,79 @@
+# Parked until the Blacksmith account is verified; nothing here runs unless
+# started by hand (docs/ci.md).
+# Builds the Linux (AppImage, deb, rpm), Android (APK) and Windows (NSIS in
+# six languages, English MSI) apps on Blacksmith runners, as artifacts; with
+# release_tag, from that tag, and adds them to its GitHub release.
+# nightly.yml and release.yml run it. The steps are scripts/ci/run.sh.
+#
+# Secrets: ANDROID_KEYSTORE_B64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS
+# (the APK is signed with a throwaway key without them); GITHUB_RELEASE_TOKEN
+# is optional, the workflow's own token can publish too.
+name: Build
+
+on:
+  workflow_call:
+    inputs:
+      release_tag:
+        type: string
+        default: ''
+
+env:
+  RELEASE_TAG: ${{ inputs.release_tag }}
+  GITHUB_RELEASE_TOKEN: ${{ secrets.GITHUB_RELEASE_TOKEN || github.token }}
+
+jobs:
+  linux:
+    name: Linux app
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.release_tag || github.ref }}
+      - run: scripts/ci/run.sh linux-app
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: linux
+          path: dist/*
+          if-no-files-found: error
+
+  android:
+    name: Android app
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.release_tag || github.ref }}
+      - run: scripts/ci/run.sh android-app
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: android
+          path: dist/*
+          if-no-files-found: error
+
+  windows:
+    name: Windows app
+    runs-on: blacksmith-4vcpu-windows-2025
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.release_tag || github.ref }}
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - run: scripts/ci/run.sh windows-test
+      - run: scripts/ci/run.sh windows-app
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows
+          path: dist/*
+          if-no-files-found: error

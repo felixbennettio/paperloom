@@ -1,0 +1,145 @@
+# The native macOS, iOS and iPadOS app. Generate the Xcode project with
+# XcodeGen (`xcodegen generate` in this directory); the .xcodeproj is not
+# committed. Build the Rust core first: scripts/build-apple-core.sh.
+name: Paperloom
+options:
+  bundleIdPrefix: io.felixbennett
+  deploymentTarget:
+    iOS: "26.0"
+    macOS: "26.0"
+  developmentLanguage: en
+  createIntermediateGroups: true
+packages:
+  CoreKit:
+    path: CoreKit
+settings:
+  base:
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "5.0"
+    DEVELOPMENT_TEAM: SZN83F2GT9
+    CODE_SIGN_STYLE: Automatic
+    PRODUCT_NAME: Paperloom
+    PRODUCT_BUNDLE_IDENTIFIER: io.felixbennett.paperloom
+    # The app's ID in the account service (Logto native app); empty turns
+    # signing in off.
+    PAPERLOOM_ACCOUNT_CLIENT_ID: v5laws0wyscuf6877geh5
+    GENERATE_INFOPLIST_FILE: YES
+    INFOPLIST_FILE: Paperloom/Support/Info.plist
+    INFOPLIST_KEY_CFBundleDisplayName: Paperloom
+    INFOPLIST_KEY_LSApplicationCategoryType: public.app-category.education
+    INFOPLIST_KEY_NSMicrophoneUsageDescription: Paperloom records audio into your notes when you ask it to.
+    ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+    SWIFT_EMIT_LOC_STRINGS: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    DEAD_CODE_STRIPPING: YES
+targetTemplates:
+  App:
+    type: application
+    sources:
+      - path: Paperloom
+        excludes:
+          - Support/*.entitlements
+          - Support/Info.plist
+      # The plugin and translator runtimes are shared with the Tauri app.
+      - path: ../core/plugin-runtime
+        type: folder
+        buildPhase: resources
+    dependencies:
+      - package: CoreKit
+        product: CoreKit
+targets:
+  Paperloom-iOS:
+    templates: [App]
+    platform: iOS
+    settings:
+      base:
+        TARGETED_DEVICE_FAMILY: "1,2"
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UIApplicationSupportsMultipleScenes: YES
+        INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace: NO
+        INFOPLIST_KEY_UISupportsDocumentBrowser: NO
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+  # UI tests that photograph the main screens on iPhone and iPad
+  # simulators (Xcode Cloud workflow "UI Screens", docs/ci.md).
+  Paperloom-iOSScreens:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: ScreensUITests
+      # The app's translations, to find its labels in other languages.
+      - path: Paperloom/Resources/Localizable.xcstrings
+        buildPhase: resources
+    dependencies:
+      - target: Paperloom-iOS
+    settings:
+      base:
+        PRODUCT_NAME: PaperloomScreens
+        SWIFT_EMIT_LOC_STRINGS: NO
+        PRODUCT_BUNDLE_IDENTIFIER: io.felixbennett.paperloom.screens
+        INFOPLIST_FILE: ""
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Paperloom-iOS
+        TARGETED_DEVICE_FAMILY: "1,2"
+  # The App Store's Mac pictures (Xcode Cloud workflow "Store Screens").
+  Paperloom-macOSScreens:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: ScreensUITests/StoreScreens.swift
+      - path: Paperloom/Resources/Localizable.xcstrings
+        buildPhase: resources
+    dependencies:
+      - target: Paperloom-macOS
+    settings:
+      base:
+        PRODUCT_NAME: PaperloomMacScreens
+        SWIFT_EMIT_LOC_STRINGS: NO
+        PRODUCT_BUNDLE_IDENTIFIER: io.felixbennett.paperloom.macscreens
+        INFOPLIST_FILE: ""
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Paperloom-macOS
+  Paperloom-macOS:
+    templates: [App]
+    platform: macOS
+    settings:
+      base:
+        # Set here rather than with XcodeGen's `entitlements:`, which rewrites
+        # the file from its `properties`. The direct-download build swaps in
+        # Paperloom-macOS-Direct.entitlements (no App Sandbox).
+        CODE_SIGN_ENTITLEMENTS: Paperloom/Support/Paperloom-macOS.entitlements
+        ENABLE_HARDENED_RUNTIME: YES
+        COMBINE_HIDPI_IMAGES: YES
+schemes:
+  Paperloom-iOS:
+    build:
+      targets:
+        Paperloom-iOS: all
+    test:
+      targets:
+        - Paperloom-iOSScreens
+      # Its one setting: no "collect diagnostics" after the run, which waited
+      # ten minutes per simulator on Xcode Cloud, even when tests passed.
+      testPlans:
+        - path: PaperloomScreens.xctestplan
+          defaultPlan: true
+        # Only the App Store's pictures (StoreScreens).
+        - path: PaperloomStore.xctestplan
+    archive:
+      config: Release
+  Paperloom-macOS:
+    build:
+      targets:
+        Paperloom-macOS: all
+    test:
+      targets:
+        - Paperloom-macOSScreens
+      testPlans:
+        - path: PaperloomStoreMac.xctestplan
+          defaultPlan: true
+    archive:
+      config: Release

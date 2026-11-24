@@ -1,0 +1,16 @@
+[package]
+name = "paperloom-fulltext"
+description = "Full-text search over items, annotations, PDF text and notes (Tantivy, with jieba for Chinese)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+jieba-rs = "0.7"
+tantivy = "0.24"
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile = "3"

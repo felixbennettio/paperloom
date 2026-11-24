@@ -1,0 +1,44 @@
+[package]
+name = "paperloom-core"
+description = "The API every Paperloom app calls: Swift through UniFFI, the Tauri app directly"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+name = "paperloom_core"
+# A plain Rust library for the Tauri app. scripts/build-apple-core.sh asks
+# for the staticlib (XCFramework) and cdylib (binding generation) itself, so
+# other platforms never build them.
+
+[dependencies]
+lopdf = { version = "0.45", default-features = false }
+base64 = "0.22"
+flate2 = "1"
+getrandom = "0.3"
+paperloom-account.workspace = true
+paperloom-ai.workspace = true
+paperloom-capture.workspace = true
+paperloom-citation.workspace = true
+paperloom-formats.workspace = true
+paperloom-fulltext.workspace = true
+paperloom-http.workspace = true
+paperloom-metadata.workspace = true
+paperloom-model.workspace = true
+paperloom-search.workspace = true
+paperloom-store.workspace = true
+paperloom-sync.workspace = true
+paperloom-sync-proto.workspace = true
+paperloom-vault.workspace = true
+pulldown-cmark = { version = "0.13", default-features = false }
+rusqlite.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2 = "0.10"
+tempfile = "3"
+thiserror.workspace = true
+uniffi.workspace = true
+uuid = { workspace = true, features = ["serde"] }
+

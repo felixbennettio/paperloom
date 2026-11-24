@@ -1,0 +1,221 @@
+# CI on the GitLab runners of git.routeforge.zone, one job at a time each:
+#   linux    ci-linux: Docker containers from gitlab-ci-linux (Ubuntu 22.04,
+#            Rust, Node, Android SDK and NDK) in a VM on EliteMini
+#   macos    ci-macos: a macOS VM (Xcode, XcodeGen, Rust), shell jobs
+#   windows  ci-windows: a Windows 11 VM (MSVC, Node, Rust, Git Bash),
+#            PowerShell jobs
+# The VMs start when a job is queued and stop after 15 idle minutes. The
+# runners name package mirrors in China (CI_CARGO_MIRROR, CI_APT_MIRROR,
+# CI_MAVEN_MIRROR, npm and pip registries) and a proxy for everything else.
+#
+# Pipelines:
+#   push, merge request   checks (scripts/ci/run.sh core, server, ui) on
+#                         Linux, then the Apple app
+#   schedule (nightly)    03:00 Beijing: when main moved in the last 25 hours,
+#                         every app to try out (.gitlab/ci/build.yml) and the
+#                         plugin compatibility check, as a child pipeline
+#   Run pipeline          BUILD=true builds every app; TESTFLIGHT=true also
+#                         sends iOS and macOS to TestFlight
+#   v* tag                every app and TestFlight, then a GitLab release
+#
+# The Apple jobs need the CI/CD variables APP_STORE_CONNECT_ISSUER_ID,
+# APP_STORE_CONNECT_KEY_ID, APP_STORE_CONNECT_PRIVATE_KEY and APPLE_TEAM_ID
+# (Admin area or project settings, protected: main and v* tags are
+# protected; the private key base64-encoded on one line, `base64 -i
+# AuthKey_XXXX.p8`, so it can be masked) and the Developer ID certificate in
+# the macOS runner's keychain.
+# ANDROID_KEYSTORE_B64, ANDROID_KEYSTORE_PASSWORD and ANDROID_KEY_ALIAS sign
+# the APK with the release key; without them it gets a throwaway test key.
+
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"
+      when: never
+    - if: $CI_COMMIT_BRANCH || $CI_COMMIT_TAG
+  auto_cancel:
+    on_new_commit: interruptible
+
+stages: [check, build, publish]
+
+variables:
+  BUILD:
+    value: "false"
+    options: ["false", "true"]
+    description: Build every app (Linux, Android, Windows, the notarized Mac DMG) as artifacts
+  TESTFLIGHT:
+    value: "false"
+    options: ["false", "true"]
+    description: Also upload the iOS and macOS apps to TestFlight
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  GIT_DEPTH: "20"
+
+include:
+  - local: .gitlab/ci/build.yml
+
+# Checks on every push and merge request, and on a run from the web without BUILD.
+.checks:
+  interruptible: true
+  rules:
+    - if: $CI_COMMIT_TAG || $CI_PIPELINE_SOURCE == "schedule" || $CI_PIPELINE_SOURCE == "parent_pipeline"
+      when: never
+    - if: $CI_PIPELINE_SOURCE == "web" && ($BUILD == "true" || $TESTFLIGHT == "true")
+      when: never
+    - when: on_success
+
+# Every non-Apple job is one scripts/ci/run.sh <job>, as on the free-tier
+# services (docs/ci.md); this file only picks the runner and keeps the files.
+core:
+  extends: .checks
+  stage: check
+  tags: [linux]
+  timeout: 40m
+  variables:
+    # At most six compilers at once; see .gitlab/ci/build.yml.
+    CARGO_BUILD_JOBS: "6"
+  script:
+    - scripts/ci/run.sh core
+  artifacts:
+    name: cargo-lock
+    when: always
+    expire_in: 2 weeks
+    paths: [Cargo.lock]
+
+server:
+  extends: .checks
+  stage: check
+  tags: [linux]
+  timeout: 40m
+  variables:
+    CARGO_BUILD_JOBS: "6"
+  script:
+    - scripts/ci/run.sh server
+  artifacts:
+    name: server-cargo-lock
+    when: always
+    expire_in: 2 weeks
+    paths: [server/Cargo.lock]
+
+ui:
+  extends: .checks
+  stage: check
+  tags: [linux]
+  timeout: 40m
+  variables:
+    CARGO_BUILD_JOBS: "6"
+  script:
+    - scripts/ci/run.sh ui
+  artifacts:
+    name: paperloom-extension
+    when: always
+    expire_in: 2 weeks
+    paths: [target/paperloom-extension.zip, app/package-lock.json]
+
+apple:
+  extends: .checks
+  stage: check
+  # When the core passed, whatever the UI did.
+  needs: [core]
+  tags: [macos]
+  timeout: 60m
+  script:
+    - scripts/ci/setup-rust.sh
+    - scripts/build-apple-core.sh --slices host
+    - swift test --package-path apple/CoreKit
+    - cd apple
+    - xcodegen generate
+    - >
+      xcodebuild build -quiet -project Paperloom.xcodeproj -scheme Paperloom-macOS
+      -destination 'platform=macOS' -configuration Debug
+      ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO
+    - echo "Built Paperloom for macOS"
+    - >
+      xcodebuild build -quiet -project Paperloom.xcodeproj -scheme Paperloom-iOS
+      -destination 'generic/platform=iOS Simulator' -configuration Debug
+      ARCHS="$(uname -m)" ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO
+    - echo "Built Paperloom for the iOS Simulator"
+
+# Nightly: the schedule's pipeline decides whether main moved since the night
+# before and starts the builds as a child pipeline.
+nightly:
+  stage: check
+  tags: [linux]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  script:
+    - |
+      AGE=$(( $(date +%s) - $(git log -1 --format=%ct) ))
+      if [ "$AGE" -lt 90000 ]; then
+        echo "Building $(git log -1 --format='%h %s')"
+        printf 'include:\n  - local: .gitlab/ci/build.yml\n' > nightly.yml
+      else
+        echo "Nothing new on main since the last night."
+        printf 'nothing-new:\n  stage: build\n  tags: [linux]\n  script: echo "Nothing new on main since the last night."\n' > nightly.yml
+      fi
+      printf 'stages: [build, publish]\n' >> nightly.yml
+  artifacts:
+    paths: [nightly.yml]
+    expire_in: 1 day
+
+nightly:build:
+  stage: build
+  needs: [nightly]
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+  trigger:
+    include:
+      - artifact: nightly.yml
+        job: nightly
+    strategy: depend
+
+# A v* tag: the tag must match the version in Cargo.toml,
+# app/src-tauri/tauri.conf.json, app/package.json and apple/project.yml.
+version:
+  stage: check
+  tags: [linux]
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v/
+  script:
+    - python3 scripts/check_versions.py "${CI_COMMIT_TAG#v}"
+
+# Publishes the release: every app built by .gitlab/ci/build.yml as files of
+# the generic package paperloom/<version>, linked from a GitLab release with
+# the notes in docs/release-notes/<tag>.md and checksums. Versions starting
+# with 0. are marked as pre-releases in the notes. A TestFlight upload that
+# failed doesn't hold the release back; a missing app does.
+publish:
+  stage: publish
+  tags: [linux]
+  needs: [version, linux, android, windows, macos]
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v/
+  interruptible: false
+  script:
+    - VERSION="${CI_COMMIT_TAG#v}"
+    - cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt && cd ..
+    - |
+      NOTES="docs/release-notes/$CI_COMMIT_TAG.md"
+      {
+        case "$VERSION" in 0.*|*-*) printf '**Pre-release / 预发布**\n\n' ;; esac
+        if [ -f "$NOTES" ]; then cat "$NOTES"; else echo "Paperloom $CI_COMMIT_TAG"; fi
+        echo
+        echo '### Checksums (SHA-256)'
+        echo '```'
+        cat dist/SHA256SUMS.txt
+        echo '```'
+      } > notes.md
+    - |
+      PKG="$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/paperloom/$VERSION"
+      links='[]'
+      for f in dist/*; do
+        name=$(basename "$f")
+        curl -fsS --retry 3 -H "JOB-TOKEN: $CI_JOB_TOKEN" --upload-file "$f" "$PKG/$name" > /dev/null
+        echo "uploaded $name"
+        links=$(jq -c --arg n "$name" --arg u "$PKG/$name" '. + [{name: $n, url: $u, link_type: "package"}]' <<<"$links")
+      done
+      jq -n --arg tag "$CI_COMMIT_TAG" --arg name "Paperloom $CI_COMMIT_TAG" --rawfile desc notes.md --argjson links "$links" \
+        '{tag_name: $tag, name: $name, description: $desc, assets: {links: $links}}' > release.json
+      curl -fsS --retry 3 -X POST -H "JOB-TOKEN: $CI_JOB_TOKEN" -H "Content-Type: application/json" \
+        --data @release.json "$CI_API_V4_URL/projects/$CI_PROJECT_ID/releases" > /dev/null
+      echo "Published Paperloom $CI_COMMIT_TAG"

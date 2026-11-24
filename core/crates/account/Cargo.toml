@@ -1,0 +1,18 @@
+[package]
+name = "paperloom-account"
+description = "Signing in to Paperloom: OpenID Connect with PKCE against the account service (Logto)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+base64 = "0.22"
+getrandom = "0.3"
+paperloom-http.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2 = "0.10"
+thiserror.workspace = true
+url = "2"

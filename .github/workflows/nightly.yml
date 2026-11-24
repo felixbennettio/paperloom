@@ -1,0 +1,32 @@
+# Parked until the Blacksmith account is verified; nothing here runs unless
+# started by hand (docs/ci.md).
+# GitHub Actions on Blacksmith runners: the Linux, Android and Windows apps
+# as artifacts of the run (build.yml), and pinned releases of common plugins
+# in the plugin runtime. Manual only (Actions > Nightly > Run workflow), as a
+# fallback when Cloud Build or Azure Pipelines are out of minutes
+# (docs/ci.md). Nothing runs on a schedule.
+name: Nightly
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  plugins:
+    name: Plugin compatibility
+    runs-on: blacksmith-2vcpu-ubuntu-2404
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: scripts/ci/run.sh plugins
+
+  build:
+    name: Build
+    uses: ./.github/workflows/build.yml
+    secrets: inherit

@@ -1,0 +1,4 @@
+# The Word add-in's HTTPS origin (the Cloudflare Pages address it is deployed
+# to, such as https://<project>.pages.dev), on the first line that is not a
+# comment. Until it is filled in, the apps offer no Word add-in
+# (scripts/word-manifest.py; docs/writing-plugins.md).

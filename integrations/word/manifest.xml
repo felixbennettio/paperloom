@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xsi:type="TaskPaneApp">
+  <Id>c6f575ad-1641-4bc3-9c1d-52049b6bba46</Id>
+  <Version>0.1.0.0</Version>
+  <ProviderName>Paperloom</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="Paperloom"/>
+  <Description DefaultValue="Search your Paperloom library and insert citations in Word."/>
+  <IconUrl DefaultValue="{{ORIGIN}}/icons/icon-32.png"/>
+  <HighResolutionIconUrl DefaultValue="{{ORIGIN}}/icons/icon-64.png"/>
+  <SupportUrl DefaultValue="https://github.com/routeforge-dev/paperloom/issues"/>
+  <Hosts>
+    <Host Name="Document"/>
+  </Hosts>
+  <Requirements>
+    <Sets DefaultMinVersion="1.1">
+      <Set Name="WordApi"/>
+    </Sets>
+  </Requirements>
+  <DefaultSettings>
+    <SourceLocation DefaultValue="{{ORIGIN}}/addin.html"/>
+  </DefaultSettings>
+  <Permissions>ReadWriteDocument</Permissions>
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts>
+      <Host xsi:type="Document">
+        <DesktopFormFactor>
+          <FunctionFile resid="Paperloom.Taskpane.Url"/>
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="Paperloom.Citations">
+                <Label resid="Paperloom.Group.Label"/>
+                <Icon>
+                  <bt:Image size="16" resid="Paperloom.Icon.16"/>
+                  <bt:Image size="32" resid="Paperloom.Icon.32"/>
+                  <bt:Image size="80" resid="Paperloom.Icon.80"/>
+                </Icon>
+                <Control xsi:type="Button" id="Paperloom.Cite">
+                  <Label resid="Paperloom.Cite.Label"/>
+                  <Supertip>
+                    <Title resid="Paperloom.Cite.Label"/>
+                    <Description resid="Paperloom.Cite.Tooltip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Paperloom.Icon.16"/>
+                    <bt:Image size="32" resid="Paperloom.Icon.32"/>
+                    <bt:Image size="80" resid="Paperloom.Icon.80"/>
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>Paperloom.Taskpane</TaskpaneId>
+                    <SourceLocation resid="Paperloom.Taskpane.Url"/>
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Paperloom.Icon.16" DefaultValue="{{ORIGIN}}/icons/icon-16.png"/>
+        <bt:Image id="Paperloom.Icon.32" DefaultValue="{{ORIGIN}}/icons/icon-32.png"/>
+        <bt:Image id="Paperloom.Icon.80" DefaultValue="{{ORIGIN}}/icons/icon-80.png"/>
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Paperloom.Taskpane.Url" DefaultValue="{{ORIGIN}}/addin.html"/>
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="Paperloom.Group.Label" DefaultValue="Paperloom"/>
+        <bt:String id="Paperloom.Cite.Label" DefaultValue="Cite"/>
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="Paperloom.Cite.Tooltip" DefaultValue="Open Paperloom to insert citations and update the reference list."/>
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>

@@ -1,0 +1,15 @@
+[package]
+name = "paperloom-metadata"
+description = "Looks up an item's details from its DOI, arXiv ID, PubMed ID or ISBN"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+paperloom-http.workspace = true
+paperloom-model.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+url = "2"

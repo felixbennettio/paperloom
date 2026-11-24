@@ -1,0 +1,11 @@
+<customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui" onLoad="OnAddinLoad">
+  <ribbon startFromScratch="false">
+    <tabs>
+      <tab id="paperloomProbeTab" label="Paperloom probe">
+        <group id="paperloomProbeGroup" label="Probe">
+          <button id="paperloomProbeRun" label="Run probe" onAction="OnAction" size="large"/>
+        </group>
+      </tab>
+    </tabs>
+  </ribbon>
+</customUI>

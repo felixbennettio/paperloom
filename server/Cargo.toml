@@ -1,0 +1,38 @@
+# Its own workspace (and lockfile), apart from the apps': see the root
+# Cargo.toml. Build with `cargo build --manifest-path server/Cargo.toml`.
+[workspace]
+resolver = "3"
+
+[package]
+name = "paperloom-server"
+description = "Paperloom Cloud: the official sync service"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.91"
+license = "LicenseRef-Proprietary"
+publish = false
+
+[dependencies]
+axum = "0.8"
+jsonwebtoken = "9"
+opendal = { version = "0.54", features = ["services-fs", "services-memory", "services-s3"] }
+paperloom-http = { path = "../core/crates/http" }
+paperloom-sync-proto = { path = "../core/crates/sync-proto" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "uuid"] }
+thiserror = "2"
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal", "sync"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1", features = ["serde", "v7"] }
+
+[dev-dependencies]
+base64 = "0.22"
+ring = "0.17"
+tower = { version = "0.5", features = ["util"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1

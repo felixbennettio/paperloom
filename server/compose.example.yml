@@ -1,0 +1,55 @@
+# An example deployment: the service, PostgreSQL and MinIO for blobs.
+# Copy it, set real passwords in an .env file next to it, and put the
+# service behind your reverse proxy (TLS ends there).
+#
+#   docker compose -f compose.example.yml up -d
+#
+# Create the MinIO bucket (paperloom) once, in its console on port 9001.
+
+services:
+  server:
+    image: paperloom-server
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    restart: unless-stopped
+    depends_on: [postgres, minio]
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      DATABASE_URL: postgres://paperloom:${POSTGRES_PASSWORD}@postgres:5432/paperloom
+      PAPERLOOM_ISSUER: https://api.sso.routeforge.zone/oidc
+      PAPERLOOM_AUDIENCE: https://sync.paperloom.routeforge.zone
+      PAPERLOOM_BLOBS: s3
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: paperloom
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY_ID: paperloom
+      S3_SECRET_ACCESS_KEY: ${MINIO_PASSWORD}
+      RUST_LOG: info
+
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: paperloom
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: paperloom
+    volumes:
+      - postgres:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio
+    restart: unless-stopped
+    command: server /data --console-address :9001
+    environment:
+      MINIO_ROOT_USER: paperloom
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD}
+    ports:
+      - "127.0.0.1:9001:9001"
+    volumes:
+      - minio:/data
+
+volumes:
+  postgres:
+  minio:

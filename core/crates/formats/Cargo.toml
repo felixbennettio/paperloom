@@ -1,0 +1,12 @@
+[package]
+name = "paperloom-formats"
+description = "Reads and writes reference files: RIS, EndNote tagged (.enw, CNKI's EndNote export), BibTeX/BibLaTeX and CSL-JSON"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+paperloom-model.workspace = true
+serde_json.workspace = true

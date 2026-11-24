@@ -1,0 +1,31 @@
+Paperloom est un atelier de recherche construit autour de vos articles : réunissez-les, lisez-les et annotez-les, prenez des notes et citez-les en écrivant. Chaque PDF, surlignage, note et dessin reste rattaché à son article : on passe de l’un à l’autre d’un geste.
+
+RÉUNIR
+• Ajoutez un article par son DOI, son identifiant arXiv ou PubMed, ou un ISBN : la notice se remplit toute seule.
+• Déposez un PDF et Paperloom reconnaît l’article à partir de ses premières pages, même numérisées.
+• Interrogez en même temps Crossref, OpenAlex, arXiv, PubMed et Semantic Scholar, ainsi que des catalogues de bibliothèques comme celui de la Library of Congress, et ajoutez les résultats directement.
+• Importez des fichiers RIS, BibTeX, EndNote XML, PubMed et Web of Science, ou ouvrez-les dans Paperloom depuis Fichiers, Mail et d’autres apps.
+
+LIRE
+• Un lecteur PDF rapide : surlignage, soulignement, commentaires, encre, formes, zones de texte, tampons et signatures, listés à côté de la page.
+• Reconnaître le texte rend les pages numérisées consultables et sélectionnables, sur votre appareil.
+• Tout rechercher trouve un mot dans le texte intégral des articles, dans vos notes et dans vos annotations.
+
+RÉFLÉCHIR ET ÉCRIRE
+• Notes Markdown avec aperçu en direct, [[liens]], rétroliens, étiquettes, modèles et graphe des liens.
+• Cartes mentales, pages manuscrites avec l’Apple Pencil et diagrammes, dans vos notes ou à part.
+• Interrogez l’IA sur un article ou toute votre bibliothèque, avec votre propre clé d’API ; les réponses citent leurs sources.
+
+CITER
+• Copiez une citation ou une bibliographie en APA, IEEE, Chicago, MLA, GB/T 7714 et bien d’autres styles.
+• Citer dans un document Word : placez des repères [@clé] dans un .docx ou un .odt et obtenez une copie avec les citations mises en forme et la bibliographie.
+
+VOS DONNÉES, VOTRE CHOIX
+• Votre bibliothèque et vos notes restent sur vos appareils. Synchronisez et sauvegardez vers l’iCloud, le WebDAV, le S3 ou le Seafile de votre choix.
+• Ni publicité, ni statistiques, ni pistage.
+
+AVEC LES OUTILS QUE VOUS CONNAISSEZ
+• Exécute de nombreux plugins Obsidian et Zotero 7 dans un bac à sable.
+• Spotlight, Raccourcis et Handoff pour vos articles et vos notes.
+
+Disponible en français, English, 简体中文, 繁體中文, 日本語 et Русский.

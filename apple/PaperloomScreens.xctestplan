@@ -1,0 +1,25 @@
+{
+  "configurations" : [
+    {
+      "id" : "5C0E4C7A-2B1D-4E86-9A44-3F2B7D9C1E01",
+      "name" : "Screens",
+      "options" : {}
+    }
+  ],
+  "defaultOptions" : {
+    "diagnosticCollectionPolicy" : "Never"
+  },
+  "testTargets" : [
+    {
+      "target" : {
+        "containerPath" : "container:Paperloom.xcodeproj",
+        "identifier" : "PAPERLOOM_SCREENS_TARGET",
+        "name" : "Paperloom-iOSScreens"
+      },
+      "skippedTests" : [
+        "StoreScreens"
+      ]
+    }
+  ],
+  "version" : 1
+}

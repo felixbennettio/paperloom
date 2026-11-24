@@ -1,0 +1,36 @@
+:root {
+  font-family: system-ui, sans-serif;
+  color: #202630;
+  background: #f7f8fa;
+  font-synthesis: none;
+  line-height: 1.5;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; }
+.addin-pane { width: 100%; max-width: 400px; padding: 16px; margin: 0 auto; overflow-wrap: anywhere; }
+h1 { font-size: 1.2rem; margin: 0 0 16px; }
+h2, legend { font-size: 1rem; font-weight: 650; }
+p { margin: 8px 0; }
+fieldset { min-width: 0; border: 1px solid #b9c2cf; border-radius: 8px; padding: 12px; margin: 16px 0; }
+label { display: block; margin: 8px 0 4px; }
+input, select, button { font: inherit; }
+input:not([type="checkbox"]), select { width: 100%; min-width: 0; padding: 8px; border: 1px solid #8794a8; border-radius: 4px; background: #fff; color: inherit; }
+button { min-height: 36px; margin: 8px 6px 0 0; padding: 6px 10px; border: 1px solid #536c91; border-radius: 4px; background: #fff; color: #174d8f; cursor: pointer; max-width: 100%; }
+button:hover:enabled { background: #e9f1ff; }
+button:disabled, fieldset:disabled { opacity: .65; cursor: default; }
+:focus-visible { outline: 3px solid #1767d2; outline-offset: 3px; }
+.addin-results { list-style: none; padding: 0; margin: 8px 0; max-height: 280px; overflow-y: auto; border-block: 1px solid #d1d8e2; }
+.addin-results label { display: flex; gap: 8px; padding: 6px 2px; margin: 0; cursor: pointer; }
+.addin-results input { flex-shrink: 0; align-self: flex-start; margin-top: 6px; }
+.addin-result-title, small { display: block; }
+small { color: #505d70; }
+.addin-selected ul { padding-left: 18px; }
+.addin-selected li { margin: 6px 0; }
+.addin-selected button { margin: 2px 0 2px 6px; }
+.addin-confirm { border: 1px solid #a16013; border-radius: 4px; padding: 8px; margin-top: 12px; }
+.addin-status { min-height: 28px; }
+.addin-error { color: #a5261b; }
+.addin-preview { border-top: 1px solid #b9c2cf; padding-top: 12px; margin-top: 16px; }
+.addin-preview-document { white-space: pre-wrap; border: 1px solid #b9c2cf; border-radius: 4px; background: #fff; padding: 12px; margin-top: 12px; }

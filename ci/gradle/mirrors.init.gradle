@@ -1,0 +1,22 @@
+// Puts a Maven mirror (CI_MAVEN_MIRROR, e.g. https://maven.aliyun.com/repository)
+// in front of Google, Maven Central and the Gradle plugin portal for every
+// build, buildSrc included. Installed into $GRADLE_USER_HOME/init.d by
+// scripts/ci/android-mirrors.sh; does nothing without the variable.
+def mirror = System.getenv('CI_MAVEN_MIRROR')
+if (mirror) {
+    def addMirrors = { repos ->
+        repos.maven { url = "${mirror}/google" }
+        repos.maven { url = "${mirror}/central" }
+        repos.maven { url = "${mirror}/gradle-plugin" }
+    }
+    beforeSettings { settings ->
+        addMirrors(settings.pluginManagement.repositories)
+        // When the mirror misses (it sometimes answers not found for a
+        // while), the plugin portal itself, through the runner's proxy.
+        settings.pluginManagement.repositories.gradlePluginPortal()
+    }
+    allprojects {
+        addMirrors(buildscript.repositories)
+        addMirrors(repositories)
+    }
+}

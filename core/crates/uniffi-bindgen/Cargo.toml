@@ -1,0 +1,11 @@
+[package]
+name = "uniffi-bindgen"
+description = "Generates the Swift bindings for paperloom-core (run by scripts/build-apple-core.sh)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+uniffi = { workspace = true, features = ["cli"] }
