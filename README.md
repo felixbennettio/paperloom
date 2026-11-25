@@ -12,6 +12,23 @@ AI, take notes, cite, and sync — in one place, on every platform.
 
 ## Screenshots
 
+### App Store (iPhone, iPad, Mac)
+
+[Download Paperloom on the App Store](https://apps.apple.com/app/id6821582256)
+
+<p>
+  <img src="docs/screenshots/iphone-1-library.png" width="220" alt="iPhone · Library with tags, authors and DOIs">
+  <img src="docs/screenshots/iphone-2-reader.png" width="220" alt="iPhone · PDF reader with highlights and annotation tools">
+  <img src="docs/screenshots/iphone-3-note.png" width="220" alt="iPhone · Markdown note with source and rendered preview">
+</p>
+<p>
+  <img src="docs/screenshots/ipad-1-reader.png" width="360" alt="iPad · PDF reader with highlights next to a note">
+  <img src="docs/screenshots/ipad-2-search.png" width="360" alt="iPad · Search Everything across items, PDF text, annotations and notes">
+</p>
+<p>
+  <img src="docs/screenshots/mac-1-library.png" width="640" alt="Mac · Library with sidebar, item list and notes pane">
+</p>
+
 ### Desktop web UI
 
 | Library and notes | Split view in Chinese dark mode |
